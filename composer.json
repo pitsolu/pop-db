@@ -46,7 +46,8 @@
     "autoload-dev": {
         "psr-4": {
             "Pop\\Db\\Test\\": "tests/"
-        }
+        },
+        "classmap": ["fixture/"]
     },
     "scripts": {
         "test": "vendor/bin/phpunit"
