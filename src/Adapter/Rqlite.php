@@ -64,7 +64,7 @@ class Rqlite extends AbstractAdapter
      * List of SQLs
      * @var array
      */
-    private array $sql = [];
+    private mixed $sql = [];
 
     /**
      * Bind parameters
@@ -119,6 +119,7 @@ class Rqlite extends AbstractAdapter
             private $curl;
             private $config;
             private $options;
+            private $response;
 
             public function __construct(Curl $curl, array $config){
 
@@ -130,7 +131,7 @@ class Rqlite extends AbstractAdapter
                 ];
             }
 
-            private function sqlStringify(mixed $sql){
+            private function toString(mixed $sql){
 
                 if(is_string($sql)){
 
@@ -150,28 +151,46 @@ class Rqlite extends AbstractAdapter
 
             public function query(mixed $sql){
 
-                $this->options["data"] = $this->sqlStringify($sql);
+                $this->options["data"] = $this->toString($sql);
 
                 $uri = sprintf("%s/db/query?%s", $this->config["host"], $this->config["qstring"]);
 
-                print_r([$this->options, $this->config, $uri]);
-
                 $client = new Client($uri, $this->options);
-                $response = $client->send();
+                $this->response = $client->send();
 
-                return $response;
+                return $this->format($this->response->json());
             }
 
-            public function execute(string $sql){
+            public function execute(mixed $sql){
 
-                $this->options["data"] = $this->sqlStringify($sql);
+                $this->options["data"] = $this->toString($sql);
 
                 $uri = sprintf("%s/db/execute?%s", $this->config["host"], $this->config["qstring"]);
 
                 $client = new Client($uri, $this->options);
-                $response = $client->send();
+                $this->response = $client->send();
 
-                return $response;
+                return $this->format($this->response->json());
+            }
+
+            public function getResponse(){
+
+                return $this->response;
+            }
+
+            public function format(array $result){
+
+                $keys = $result["results"][0]["columns"];
+                $values = $result["results"][0]["values"];
+
+                $rows = [];
+                if(count($values) == count($values, COUNT_RECURSIVE)) //not_multidimentional
+                    return array_combine($keys, $values[0]);
+
+                foreach($values as $row)
+                    $rows[] = array_combine($keys, $row);
+
+                return $rows;
             }
         };
     }
@@ -293,7 +312,8 @@ class Rqlite extends AbstractAdapter
      */
     public function bindParams(array $params): Rqlite
     {
-        $this->params = array_merge($this->params, $params);
+        foreach($params as $param=>$value)
+            $this->params[$param] = $value;
 
         return $this;
     }
@@ -335,11 +355,10 @@ class Rqlite extends AbstractAdapter
      */
     public function execute(): Rqlite
     {
-        $params = $this->params;
+        foreach($this->params as $param=>$value)
+            $this->sql = str_replace($value, $this->escape($value), $this->sql);
 
-        $this->sql[] = array_merge($this->sql, $params);
-
-        $this->result = $this->connection->execute($this->sql);
+        $this->result = $this->connection->query($this->sql);
 
         return $this;
     }
@@ -355,9 +374,9 @@ class Rqlite extends AbstractAdapter
             $this->throwError('Error: The database result resource is not currently set.');
         }
 
-        $rows = $this->result->results[0]->rows;
+        $row = array_pop($this->result);
 
-        return $rows;
+        return $row;
     }
 
     /**
@@ -367,13 +386,7 @@ class Rqlite extends AbstractAdapter
      */
     public function fetchAll(): array
     {
-        $rows = [];
-
-        while (($row = $this->fetch())) {
-            $rows[] = $row;
-        }
-
-        return $rows;
+        return $this->result;
     }
 
     /**
@@ -406,7 +419,7 @@ class Rqlite extends AbstractAdapter
     {
         $result = $this->connection->query("SELECT last_insert_rowid() as last_id");
 
-        return $result->results[0]->rows[0]["last_id"];
+        return $result;
     }
 
     /**
@@ -431,7 +444,7 @@ class Rqlite extends AbstractAdapter
     {
         $result = $this->connection->query("PRAGMA count_changes;");
 
-        return $result->results[0]->rows[0]["count_changes"];
+        return $result;
     }
 
     /**
@@ -443,7 +456,7 @@ class Rqlite extends AbstractAdapter
     {
         $result = $this->connection->query("SELECT sqlite_version() as version;");
 
-        return $result->results[0]->rows[0]["version"];
+        return $result;
     }
 
     /**
@@ -458,9 +471,8 @@ class Rqlite extends AbstractAdapter
             "UNION ALL SELECT name FROM sqlite_temp_master WHERE type IN ('table', 'view') ORDER BY 1";
 
         $this->query($sql);
-        $rows = $this->result->results[0]->rows;
 
-        foreach($rows as $row)
+        foreach($this->result as $row)
             $tables[] = $row["name"];
 
         return $tables;

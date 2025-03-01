@@ -4,6 +4,7 @@
 // use Kami\Rqlite\Adapters\Curl;
 
 use Pop\Db\Adapter\Rqlite;
+use Pop\Db\Db;
 
 require "vendor/autoload.php";
 
@@ -14,4 +15,5 @@ require "vendor/autoload.php";
 // Create a Rqlite client instance and pass the adapter as a constructor argument
 // $rqlite = new Rqlite($curlAdapter);
 
+$db = Db::connect("rqlite", ["url"=>"http://localhost:4001"]);
 $rq = new Rqlite(["url"=>"http://localhost:4001"]);
