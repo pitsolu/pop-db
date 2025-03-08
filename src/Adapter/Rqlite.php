@@ -102,83 +102,48 @@ class Rqlite extends AbstractAdapter
         return $this;
     }
 
-    protected function getClient(){
-
-        $curl = new Curl();
-        $curl->setOptions([
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1
-        ]);
+    public function getClient(){
 
         $config = array(
             "host"=>$this->options["url"]??"http://localhost:4001",
             "qstring"=>"pretty&timings"
         );
 
-        return new class($curl, $config){
+        $options = [
+            "method"=>"POST",
+            "type"=>Request::JSON
+        ];
 
-            private $curl;
-            private $config;
-            private $options;
-            private $response;
+        $toString = function(mixed $sql){
 
-            public function __construct(Curl $curl, array $config){
+            if(is_string($sql)){
 
-                $this->curl = $curl;
-                $this->config = $config;
-                $this->options = [
-                    "method"=>"POST",
-                    "type"=>Request::JSON
-                ];
+                $sql = sprintf("[%s]", $sql);
+            }
+            
+            if(is_array($sql)){
+
+                $sql = array_map(fn($v)=>sprintf("\"%s\"",$v),  $sql);
+                $sql = sprintf("[[%s]]", implode(",", $sql));
             }
 
-            private function toString(mixed $sql){
+            return $sql;
+        };
 
-                if(is_string($sql)){
+        $client = function(string $type, string $sql) use($config, $options, $toString){
 
-                    $sql = sprintf("[\"%s\"]", $sql);
-                }
-                elseif(is_array($sql)){
+            $uri = sprintf("%s/db/%s?%s", $config["host"], $type, $config["qstring"]);
+            $options["data"] = $toString($sql); 
 
-                    $temp = array_shift($sql);
-                    $params = array_shift($sql);
-                    $sql = $temp;
+            $client = new Client($uri, $options);
+            $response = $client->send();
 
-                    $sql = sprintf("[[\"%s\", %s]]", $sql, json_encode($params));
-                }
+            return $response;
+        };
 
-                return $sql;
-            }
+        $format = function(array $result){
 
-            public function query(mixed $sql){
-
-                $this->options["data"] = $this->toString($sql);
-
-                $uri = sprintf("%s/db/query?%s", $this->config["host"], $this->config["qstring"]);
-
-                $client = new Client($uri, $this->options);
-                $this->response = $client->send();
-
-                return $this->format($this->response->json());
-            }
-
-            public function execute(mixed $sql){
-
-                $this->options["data"] = $this->toString($sql);
-
-                $uri = sprintf("%s/db/execute?%s", $this->config["host"], $this->config["qstring"]);
-
-                $client = new Client($uri, $this->options);
-                $this->response = $client->send();
-
-                return $this->format($this->response->json());
-            }
-
-            public function getResponse(){
-
-                return $this->response;
-            }
-
-            public function format(array $result){
+            if(!empty($result)){
 
                 $keys = $result["results"][0]["columns"];
                 $values = $result["results"][0]["values"];
@@ -191,6 +156,33 @@ class Rqlite extends AbstractAdapter
                     $rows[] = array_combine($keys, $row);
 
                 return $rows;
+            }
+
+            return [];
+        };
+
+        return new class($client, $format){
+
+            private $fn;
+
+            public function __construct(callable $client, callable $format){
+
+                $this->fn["client"] = $client;
+                $this->fn["format"] = $format;
+            }
+
+            public function execute(mixed $sql){
+
+                $response = $this->fn["client"]("execute", $sql);
+
+                return $response->json();
+            }
+
+            public function query(mixed $sql){
+
+                $response = $this->fn["client"]("query", $sql);
+
+                return $this->fn["format"]($response->json());
             }
         };
     }
@@ -228,7 +220,7 @@ class Rqlite extends AbstractAdapter
      */
     public function dbFileExists(): bool
     {
-        return (isset($this->options['database']) && file_exists($this->options['database']));
+        return (isset($this->options['url']) && file_exists($this->options['url']));
     }
 
     /**
@@ -355,10 +347,32 @@ class Rqlite extends AbstractAdapter
      */
     public function execute(): Rqlite
     {
-        foreach($this->params as $param=>$value)
-            $this->sql = str_replace($value, $this->escape($value), $this->sql);
+        if((str_starts_with($this->sql, "UPDATE") 
+            || str_starts_with($this->sql, "INSERT")
+            || str_starts_with($this->sql, "DELETE"))
+            && str_contains($this->sql, "NULL")){
+            
+            $temp = str_replace("NULL", "?", $this->sql);
+            $this->sql = array_merge([$temp], array_values($this->params));
 
-        $this->result = $this->connection->query($this->sql);
+            $this->result = $this->connection->execute($this->sql);
+        }
+
+        if(str_starts_with($this->sql, "SELECT")){
+
+            if(!is_array($this->sql))
+                foreach($this->params as $param=>$value)
+                    $this->sql = str_replace($value, "?", $this->sql);
+
+            $temp = $this->sql;
+            $params = array_map(fn($v)=>sprintf("\"%s\"", $v), $this->params);
+            
+            $sql[] = sprintf("\"%s\"", $temp);
+            $sql = array_merge($sql, $params);
+            $sql = sprintf("[%s]", implode(",", $sql));
+
+            $this->result = $this->connection->query($sql);
+        }
 
         return $this;
     }
@@ -417,9 +431,8 @@ class Rqlite extends AbstractAdapter
      */
     public function getLastId(): int
     {
-        $result = $this->connection->query("SELECT last_insert_rowid() as last_id");
 
-        return $result;
+        return 0;
     }
 
     /**
