@@ -360,16 +360,23 @@ class Rqlite extends AbstractAdapter
 
         if(str_starts_with($this->sql, "SELECT")){
 
-            if(!is_array($this->sql))
-                foreach($this->params as $param=>$value)
-                    $this->sql = str_replace($value, "?", $this->sql);
+            if(empty($this->params))
+                $sql = sprintf("[\"%s\"]", $this->sql);
 
-            $temp = $this->sql;
-            $params = array_map(fn($v)=>sprintf("\"%s\"", $v), $this->params);
-            
-            $sql[] = sprintf("\"%s\"", $temp);
-            $sql = array_merge($sql, $params);
-            $sql = sprintf("[%s]", implode(",", $sql));
+            if(!empty($this->params)){
+
+                if(!is_array($this->sql))
+                    foreach($this->params as $param=>$value)
+                        $this->sql = str_replace($value, "?", $this->sql);
+
+                $temp = $this->sql;
+                $params = array_map(fn($v)=>sprintf("\"%s\"", $v), $this->params);
+                $this->params = [];
+                
+                $sql[] = sprintf("\"%s\"", $temp);
+                $sql = array_merge($sql, $params);
+                $sql = sprintf("[%s]", implode(",", $sql));
+            }
 
             $this->result = $this->connection->query($sql);
         }
@@ -431,7 +438,6 @@ class Rqlite extends AbstractAdapter
      */
     public function getLastId(): int
     {
-
         return 0;
     }
 
