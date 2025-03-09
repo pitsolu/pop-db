@@ -135,6 +135,8 @@ class Rqlite extends AbstractAdapter
             $uri = sprintf("%s/db/%s?%s", $config["host"], $type, $config["qstring"]);
             $options["data"] = $toString($sql); 
 
+            // print_r($options["data"]);
+
             $client = new Client($uri, $options);
             $response = $client->send();
 
@@ -189,7 +191,6 @@ class Rqlite extends AbstractAdapter
 
     /**
      * Set database connection options
-     *
      * @param  array $options
      * @return Sqlite
      */
@@ -463,7 +464,9 @@ class Rqlite extends AbstractAdapter
     {
         $result = $this->connection->query("PRAGMA count_changes;");
 
-        return $result;
+        $count = current($result);
+
+        return $count??0;
     }
 
     /**
@@ -473,9 +476,13 @@ class Rqlite extends AbstractAdapter
      */
     public function getVersion(): string
     {
-        $result = $this->connection->query("SELECT sqlite_version() as version;");
 
-        return $result;
+        $sql = "SELECT sqlite_version() as version;";
+
+        $result = $this->connection->query(sprintf('["%s"]', $sql));
+        $result = current($result);
+
+        return $result["version"];
     }
 
     /**
@@ -489,7 +496,7 @@ class Rqlite extends AbstractAdapter
         $sql    = "SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' " .
             "UNION ALL SELECT name FROM sqlite_temp_master WHERE type IN ('table', 'view') ORDER BY 1";
 
-        $this->query($sql);
+        $this->query(sprintf('["%s"]', $sql));
 
         foreach($this->result as $row)
             $tables[] = $row["name"];
