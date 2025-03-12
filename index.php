@@ -3,8 +3,10 @@
 // use Kami\Rqlite\Rqlite;
 // use Kami\Rqlite\Adapters\Curl;
 
-use Pop\Db\Adapter\Rqlite;
+// use Pop\Db\Adapter\Rqlite;
 use Pop\Db\Db;
+use Pop\Db\Record;
+
 
 require "vendor/autoload.php";
 
@@ -16,4 +18,8 @@ require "vendor/autoload.php";
 // $rqlite = new Rqlite($curlAdapter);
 
 $db = Db::connect("rqlite", ["url"=>"http://localhost:4001"]);
-$rq = new Rqlite(["url"=>"http://localhost:4001"]);
+User::setDb($db);
+// Record::setDb($db);
+// $rq = new Rqlite(["url"=>"http://localhost:4001"]);
+
+

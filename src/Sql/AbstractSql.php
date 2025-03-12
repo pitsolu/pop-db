@@ -35,6 +35,7 @@ abstract class AbstractSql
     const PGSQL  = 'PGSQL';
     const SQLITE = 'SQLITE';
     const SQLSRV = 'SQLSRV';
+    const RQLITE = 'RQLITE';
 
     /**
      * Constants for id quote types
@@ -175,6 +176,16 @@ abstract class AbstractSql
     public function isSqlite(): bool
     {
         return ($this->dbType == self::SQLITE);
+    }
+
+    /**
+     * Determine if the DB type is Rqlite
+     *
+     * @return bool
+     */
+    public function isRqlite(): bool
+    {
+        return ($this->dbType == self::RQLITE);
     }
 
     /**
@@ -361,7 +372,7 @@ abstract class AbstractSql
                 case self::PGSQL:
                     $parameter = '$' . $this->parameterCount;
                     break;
-                case self::SQLITE:
+                case self::SQLITE or self::RQLITE:
                     if ($column !== null) {
                         $parameter = ':' . $column;
                     }
@@ -464,6 +475,12 @@ abstract class AbstractSql
             $this->idQuoteType = self::BRACKET;
             if ($this->placeholder === null) {
                 $this->placeholder = '?';
+            }
+        } else if (stripos($adapter, 'rqlite') !== false) {
+            $this->dbType      = self::SQLITE;
+            $this->idQuoteType = self::DOUBLE_QUOTE;
+            if ($this->placeholder === null) {
+                $this->placeholder = ':';
             }
         }
 

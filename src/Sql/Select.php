@@ -380,7 +380,7 @@ class Select extends AbstractPredicateClause
         $this->orderBy .= (($this->orderBy !== null) ? ', ' : '') . $byColumns;
 
         if (str_contains($order, 'RAND')) {
-            $this->orderBy .= ($this->isSqlite()) ? ' RANDOM()' : ' RAND()';
+            $this->orderBy .= ($this->isSqlite() || $this->isRqlite()) ? ' RANDOM()' : ' RAND()';
         } else if (($order == 'ASC') || ($order == 'DESC')) {
             $this->orderBy .= ' ' . $order;
         }

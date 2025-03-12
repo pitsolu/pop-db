@@ -130,12 +130,10 @@ class Rqlite extends AbstractAdapter
             return $sql;
         };
 
-        $client = function(string $type, string $sql) use($config, $options, $toString){
+        $client = function(string $type, mixed $sql) use($config, $options, $toString){
 
             $uri = sprintf("%s/db/%s?%s", $config["host"], $type, $config["qstring"]);
-            $options["data"] = $toString($sql); 
-
-            // print_r($options["data"]);
+            $options["data"] = $toString($sql);
 
             $client = new Client($uri, $options);
             $response = $client->send();
@@ -350,13 +348,14 @@ class Rqlite extends AbstractAdapter
     {
         if((str_starts_with($this->sql, "UPDATE") 
             || str_starts_with($this->sql, "INSERT")
-            || str_starts_with($this->sql, "DELETE"))
-            && str_contains($this->sql, "NULL")){
+            || str_starts_with($this->sql, "DELETE"))){
             
             $temp = str_replace("NULL", "?", $this->sql);
             $this->sql = array_merge([$temp], array_values($this->params));
 
             $this->result = $this->connection->execute($this->sql);
+
+            return $this;
         }
 
         if(str_starts_with($this->sql, "SELECT")){
@@ -368,21 +367,23 @@ class Rqlite extends AbstractAdapter
 
                 if(!is_array($this->sql))
                     foreach($this->params as $param=>$value)
-                        $this->sql = str_replace($value, "?", $this->sql);
+                        // $this->sql = str_replace($value, "?", $this->sql);
+                        $this->sql = str_replace(":".$param, "?", $this->sql);
 
                 $temp = $this->sql;
                 $params = array_map(fn($v)=>sprintf("\"%s\"", $v), $this->params);
                 $this->params = [];
                 
+                $temp = str_replace("\"",'', $temp);
                 $sql[] = sprintf("\"%s\"", $temp);
                 $sql = array_merge($sql, $params);
                 $sql = sprintf("[%s]", implode(",", $sql));
             }
 
             $this->result = $this->connection->query($sql);
-        }
 
-        return $this;
+            return $this;
+        }
     }
 
     /**
@@ -462,11 +463,12 @@ class Rqlite extends AbstractAdapter
      */
     public function getNumberOfAffectedRows(): int
     {
-        $result = $this->connection->query("PRAGMA count_changes;");
+        $sql = "PRAGMA count_changes;";
 
-        $count = current($result);
+        $result = $this->connection->query(sprintf('["%s"]', $sql));
+        $result = current($result);
 
-        return $count??0;
+        return $result['count_changes']??0;
     }
 
     /**
@@ -500,6 +502,7 @@ class Rqlite extends AbstractAdapter
 
         foreach($this->result as $row)
             $tables[] = $row["name"];
+
 
         return $tables;
     }

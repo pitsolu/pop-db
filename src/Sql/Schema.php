@@ -174,7 +174,7 @@ class Schema extends AbstractSql
         if (!$this->foreignKeyCheck) {
             if ($this->isMysql()) {
                 $sql .= 'SET foreign_key_checks = 0;' . PHP_EOL . PHP_EOL;
-            } else if ($this->isSqlite()) {
+            } else if ($this->isSqlite() || $this->isRqlite()) {
                 $sql .= 'PRAGMA foreign_keys=off;' . PHP_EOL . PHP_EOL;
             }
         }
@@ -207,7 +207,7 @@ class Schema extends AbstractSql
         if (!$this->foreignKeyCheck) {
             if ($this->isMysql()) {
                 $sql .= 'SET foreign_key_checks = 1;' . PHP_EOL . PHP_EOL;
-            } else if ($this->isSqlite()) {
+            } else if ($this->isSqlite() || $this->isRqlite()) {
                 $sql .= 'PRAGMA foreign_keys=on;' . PHP_EOL . PHP_EOL;
             }
         }
@@ -245,7 +245,7 @@ class Schema extends AbstractSql
         if (!$this->foreignKeyCheck) {
             if ($this->isMysql()) {
                 $this->db->query('SET foreign_key_checks = 0');
-            } else if ($this->isSqlite()) {
+            } else if ($this->isSqlite() || $this->isRqlite()) {
                 $this->db->query('PRAGMA foreign_keys=off');
             }
         }
@@ -293,7 +293,7 @@ class Schema extends AbstractSql
         if (!$this->foreignKeyCheck) {
             if ($this->isMysql()) {
                 $this->db->query('SET foreign_key_checks = 1');
-            } else if ($this->isSqlite()) {
+            } else if ($this->isSqlite() || $this->isRqlite()) {
                 $this->db->query('PRAGMA foreign_keys=on');
             }
         }
