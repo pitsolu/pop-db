@@ -145,15 +145,19 @@ class Rqlite extends AbstractAdapter
 
             if(!empty($result)){
 
-                $keys = $result["results"][0]["columns"];
-                $values = $result["results"][0]["values"];
+                $result = current($result["results"]);
+                $keys = $result["columns"];
+                $values = @$result["values"];
 
                 $rows = [];
-                if(count($values) == count($values, COUNT_RECURSIVE)) //not_multidimentional
-                    return array_combine($keys, $values[0]);
+                if(!empty($values)){
 
-                foreach($values as $row)
-                    $rows[] = array_combine($keys, $row);
+                    if(count($values) == count($values, COUNT_RECURSIVE)) //not_multidimentional
+                        return array_combine($keys, $values[0]);
+
+                    foreach($values as $row)
+                        $rows[] = array_combine($keys, $row);
+                }
 
                 return $rows;
             }
@@ -360,6 +364,8 @@ class Rqlite extends AbstractAdapter
 
         if(str_starts_with($this->sql, "SELECT")){
 
+            $this->sql = str_replace("\"",'', $this->sql);
+
             if(empty($this->params))
                 $sql = sprintf("[\"%s\"]", $this->sql);
 
@@ -374,7 +380,6 @@ class Rqlite extends AbstractAdapter
                 $params = array_map(fn($v)=>sprintf("\"%s\"", $v), $this->params);
                 $this->params = [];
                 
-                $temp = str_replace("\"",'', $temp);
                 $sql[] = sprintf("\"%s\"", $temp);
                 $sql = array_merge($sql, $params);
                 $sql = sprintf("[%s]", implode(",", $sql));
