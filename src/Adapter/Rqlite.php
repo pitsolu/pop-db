@@ -281,6 +281,8 @@ class Rqlite extends AbstractAdapter
      */
     public function query(mixed $sql): Rqlite
     {
+        $this->lastSql = (stripos($sql, 'select') !== false) ? $sql : null;
+
         $this->result = $this->connection->query($sql);
     
         return $this;
@@ -350,6 +352,8 @@ class Rqlite extends AbstractAdapter
      */
     public function execute(): Rqlite
     {
+        $this->lastSql = (stripos($this->sql, 'select') !== false) ? $this->sql : null;
+
         if((str_starts_with($this->sql, "UPDATE") 
             || str_starts_with($this->sql, "INSERT")
             || str_starts_with($this->sql, "DELETE"))){
@@ -445,6 +449,24 @@ class Rqlite extends AbstractAdapter
      */
     public function getLastId(): int
     {
+        $table = null;
+        $tokens = [];
+
+        if(!is_null($this->lastSql)){
+
+            $lastSql = str_replace("\"","", $this->lastSql);
+
+            preg_match_all("/(INTO|FROM)\s+(\w+)[\s+|\(]/", $lastSql, $tokens);
+            $tokens = end($tokens);
+            $table = end($tokens);
+
+            $sql = sprintf("SELECT seq FROM sqlite_sequence WHERE name='%s'", $table);
+            $result = $this->connection->query(sprintf('["%s"]', $sql));
+            $result = current($result);
+
+            return $result["seq"];
+        }
+
         return 0;
     }
 
