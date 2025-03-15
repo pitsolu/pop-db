@@ -135,6 +135,8 @@ class Rqlite extends AbstractAdapter
             $uri = sprintf("%s/db/%s?%s", $config["host"], $type, $config["qstring"]);
             $options["data"] = $toString($sql);
 
+            print_r([$options["data"]]);
+
             $client = new Client($uri, $options);
             $response = $client->send();
 
@@ -358,8 +360,19 @@ class Rqlite extends AbstractAdapter
             || str_starts_with($this->sql, "INSERT")
             || str_starts_with($this->sql, "DELETE"))){
             
-            $temp = str_replace("NULL", "?", $this->sql);
-            $this->sql = array_merge([$temp], array_values($this->params));
+            if(str_contains($this->sql, "NULL")){
+
+                $temp = str_replace("NULL", "?", $this->sql);
+                $this->sql = array_merge([$temp], array_values($this->params));
+            }
+
+            //if full assoc array
+            // enter into rqlite format
+            if(count(array_filter(array_keys($this->params), 'is_string')) == count($this->params)){
+
+                $temp = str_replace("\"",'', $this->sql);
+                $this->sql = sprintf("[\"%s\", %s]", $temp, json_encode($this->params));
+            }
 
             $this->result = $this->connection->execute($this->sql);
 
@@ -378,7 +391,7 @@ class Rqlite extends AbstractAdapter
                 if(!is_array($this->sql))
                     foreach($this->params as $param=>$value)
                         // $this->sql = str_replace($value, "?", $this->sql);
-                        $this->sql = str_replace(":".$param, "?", $this->sql);
+                        $this->sql = str_replace(sprintf(":%s", $param), "?", $this->sql);
 
                 $temp = $this->sql;
                 $params = array_map(fn($v)=>sprintf("\"%s\"", $v), $this->params);
@@ -535,3 +548,8 @@ class Rqlite extends AbstractAdapter
     }
 
 }
+
+// function is_array_assoc(array $values){
+
+//     return count($values) == count($values, COUNT_RECURSIVE);
+// }
